@@ -34,37 +34,34 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release-apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v2.0.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v2.1.0.apk
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ApexTelemetry-v2.0.0-apk
-          path: release-apk/ApexTelemetry-v2.0.0.apk
+          name: ApexTelemetry-v2.1.0-apk
+          path: release-apk/ApexTelemetry-v2.1.0.apk
           retention-days: 30
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v2.0.0
-          name: "ApexTelemetry v2.0.0 - Full-Fledged Application Revamp"
+          tag_name: v2.1.0
+          name: "ApexTelemetry v2.1.0 - Reliability First Edition"
           body: |
-            ### 🏍️ ApexTelemetry v2.0.0 (Full-Fledged Application Experience)
+            ### 🏍️ ApexTelemetry v2.1.0 (Reliability First Edition)
             Motorcycle Lean & G-Force Telemetry HUD (Optimized for Samsung Galaxy S20 FE).
 
-            #### What's New in v2.0.0:
-            - **True Immersive Sticky Fullscreen:** System bars and navigation pill hidden for an edge-to-edge 120Hz Super AMOLED cockpit.
-            - **Options & Settings Drawer (☰):** Comprehensive slide-out menu for all cockpit customizations.
-            - **Aerospace 3D Quaternion Gravity Fusion:** Fixed lean angle calculation with pitch decoupling and dynamic adaptive filtering.
-            - **Dedicated Manual Calibration:** Removed forced auto-calibration on ride start; full manual "Tare Zero" control with 1-tap header shortcut.
-            - **Configurable Max Lean Scale:** Choose between 45° (Cruiser/Street), 55° (Sport/Twisties), or 65° (Track/MotoGP).
-            - **Trip Telemetry Tracking:** Moving Average Speed, Top Speed, Duration, Max L/R Lean, and G-Forces logged per ride.
-            - **Speed Units:** Toggle between KM/H and MPH.
-            - **Revamped Skeuomorphic Gauges:** Metallic brushed bezels, drop-glow needles, and illuminated tick marks across all 4 display styles (Classic Analog Dial, MotoGP Digital, Rally Twin Pods, and HUD Windshield Mirror).
+            #### The 5 Pillars of Reliability in v2.1.0:
+            1. **Sensor Health & GPS Quality:** Live meter displaying GPS accuracy in ±meters (HDOP), satellite lock status, and IMU update rate (Hz).
+            2. **Reliable Ride Recording & Crash Recovery:** Write-Ahead Logging (WAL) saves in-flight ride points every 5 seconds to disk. If battery dies, phone overheats, or app crashes, the session is recovered on reboot.
+            3. **GPS Speed & Distance Integration:** High-precision geodesic trip odometer (km/mi) and multipath spike rejection (>280 km/h).
+            4. **Lean-Angle Validation & Manual Horizon Tare:** Aerospace 3D Quaternion gravity fusion with manual level confirmation.
+            5. **Ride History & Export Engine:** 1-tap **GPX Export** (for Strava/Garmin/Google Earth) and **CSV Telemetry Export** (for MoTeC/Excel) via Android Share Sheet.
 
             **Download & Install:**
-            Download `ApexTelemetry-v2.0.0.apk` below and open it on your Android phone.
-          files: release-apk/ApexTelemetry-v2.0.0.apk
+            Download `ApexTelemetry-v2.1.0.apk` below and open it on your Android phone.
+          files: release-apk/ApexTelemetry-v2.1.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

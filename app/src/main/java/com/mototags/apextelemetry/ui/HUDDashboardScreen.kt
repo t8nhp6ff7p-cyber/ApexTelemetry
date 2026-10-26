@@ -55,8 +55,10 @@ import com.mototags.apextelemetry.ui.components.GForceMeter
 import com.mototags.apextelemetry.ui.components.HUDMirrorView
 import com.mototags.apextelemetry.ui.components.LeanGauge
 import com.mototags.apextelemetry.ui.components.RallyTwinGauge
+import com.mototags.apextelemetry.ui.components.SensorHealthBar
 import com.mototags.apextelemetry.ui.components.Speedometer
 import com.mototags.apextelemetry.ui.screens.OptionsDrawerContent
+import com.mototags.apextelemetry.ui.screens.RecoveryDialog
 import com.mototags.apextelemetry.ui.screens.RideSummaryDialog
 import com.mototags.apextelemetry.ui.screens.SavedRidesScreen
 import com.mototags.apextelemetry.ui.theme.DarkCard
@@ -95,7 +97,7 @@ fun HUDDashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "RIDES LOGBOOK",
+                        text = "RIDES LOGBOOK & EXPORTS",
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
                         fontWeight = FontWeight.Black
@@ -110,25 +112,37 @@ fun HUDDashboardScreen(
                 SavedRidesScreen(
                     rides = savedRides,
                     onDeleteRide = { viewModel.deleteRide(it) },
+                    onExportGpx = { viewModel.exportRideGpx(it) },
+                    onExportCsv = { viewModel.exportRideCsv(it) },
                     modifier = Modifier.weight(1f)
                 )
             }
         } else {
-            // Main Cockpit Screen
+            // Cockpit Screen
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(14.dp)
+                    .padding(12.dp)
             ) {
-                // Top Cockpit Bar with Menu Icon and Manual Tare Shortcut
+                // Cockpit Header Bar
                 CockpitTopBar(
                     data = telemetryData,
                     onOpenMenu = { viewModel.setDrawerOpen(true) },
                     onManualTare = { viewModel.calibrateManual() }
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
+                // Pillar 1: Sensor Health & GPS Quality Bar
+                SensorHealthBar(
+                    health = telemetryData.sensorHealth,
+                    tripDistanceKm = telemetryData.tripDistanceKm,
+                    speedUnit = telemetryData.speedUnit
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Center Instruments
                 Box(modifier = Modifier.weight(1f)) {
                     if (isLandscape) {
                         LandscapeCockpit(data = telemetryData, viewModel = viewModel)
@@ -161,6 +175,18 @@ fun HUDDashboardScreen(
             }
         }
 
+        // Pillar 2: Crash Recovery Dialog (Write-Ahead Log)
+        telemetryData.recoveredRide?.let { recovered ->
+            RecoveryDialog(
+                recoveredRide = recovered,
+                onSave = {
+                    viewModel.saveRecoveredRide()
+                    showSavedRidesScreen = true
+                },
+                onDismiss = { viewModel.dismissRecovery() }
+            )
+        }
+
         // Ride Summary Dialog
         if (telemetryData.showSummaryDialog) {
             RideSummaryDialog(
@@ -185,7 +211,7 @@ private fun PortraitCockpit(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Center Selected Gauge Cluster
+        // Selected Gauge Cluster
         Box(
             modifier = Modifier.weight(1.3f),
             contentAlignment = Alignment.Center
@@ -243,7 +269,7 @@ private fun PortraitCockpit(
             }
         }
 
-        // Sub Instruments (Speed & G-Force radar when not in Rally or Mirror mode)
+        // Sub Instruments (Speed & G-Force Radar)
         if (data.displayStyle == DisplayStyle.ANALOG_DIAL || data.displayStyle == DisplayStyle.DIGITAL_MOTO) {
             Row(
                 modifier = Modifier
@@ -273,7 +299,7 @@ private fun PortraitCockpit(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Large Ride Controls
         when (data.rideState) {
@@ -282,7 +308,7 @@ private fun PortraitCockpit(
                     onClick = { viewModel.startRide() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(58.dp)
+                    modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.padding(end = 8.dp))
                     Text("START RIDE SESSION", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.Black)
@@ -297,7 +323,7 @@ private fun PortraitCockpit(
                         onClick = { viewModel.pauseRide() },
                         colors = ButtonDefaults.buttonColors(containerColor = DarkCard),
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f).height(56.dp)
+                        modifier = Modifier.weight(1f).height(54.dp)
                     ) {
                         Icon(Icons.Default.Pause, contentDescription = null, tint = Color.White, modifier = Modifier.padding(end = 6.dp))
                         Text("PAUSE", fontWeight = FontWeight.Bold, color = Color.White)
@@ -307,7 +333,7 @@ private fun PortraitCockpit(
                         onClick = { viewModel.finishRide() },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonRed),
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f).height(56.dp)
+                        modifier = Modifier.weight(1f).height(54.dp)
                     ) {
                         Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White, modifier = Modifier.padding(end = 6.dp))
                         Text("FINISH RIDE", fontWeight = FontWeight.Bold, color = Color.White)
@@ -323,7 +349,7 @@ private fun PortraitCockpit(
                         onClick = { viewModel.resumeRide() },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f).height(56.dp)
+                        modifier = Modifier.weight(1f).height(54.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.padding(end = 6.dp))
                         Text("RESUME", fontWeight = FontWeight.Bold, color = Color.Black)
@@ -333,7 +359,7 @@ private fun PortraitCockpit(
                         onClick = { viewModel.finishRide() },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonRed),
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f).height(56.dp)
+                        modifier = Modifier.weight(1f).height(54.dp)
                     ) {
                         Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White, modifier = Modifier.padding(end = 6.dp))
                         Text("FINISH", fontWeight = FontWeight.Bold, color = Color.White)
@@ -354,7 +380,7 @@ private fun LandscapeCockpit(
         modifier = Modifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left Column: Instruments and Ride Controls
+        // Left Column: Instruments & Ride Controls
         Column(
             modifier = Modifier
                 .weight(1.1f)
@@ -390,7 +416,7 @@ private fun LandscapeCockpit(
                     onClick = { viewModel.startRide() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.padding(end = 6.dp))
                     Text("START RIDE SESSION", fontWeight = FontWeight.Black, color = Color.Black)
@@ -405,7 +431,7 @@ private fun LandscapeCockpit(
                             onClick = { viewModel.pauseRide() },
                             colors = ButtonDefaults.buttonColors(containerColor = DarkCard),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(46.dp)
+                            modifier = Modifier.weight(1f).height(44.dp)
                         ) {
                             Text("PAUSE", fontWeight = FontWeight.Bold)
                         }
@@ -414,7 +440,7 @@ private fun LandscapeCockpit(
                             onClick = { viewModel.resumeRide() },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(46.dp)
+                            modifier = Modifier.weight(1f).height(44.dp)
                         ) {
                             Text("RESUME", fontWeight = FontWeight.Bold, color = Color.Black)
                         }
@@ -424,7 +450,7 @@ private fun LandscapeCockpit(
                         onClick = { viewModel.finishRide() },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonRed),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).height(46.dp)
+                        modifier = Modifier.weight(1f).height(44.dp)
                     ) {
                         Text("FINISH", fontWeight = FontWeight.Bold)
                     }
@@ -432,7 +458,7 @@ private fun LandscapeCockpit(
             }
         }
 
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         // Right Column: Active Gauge Cluster
         Box(

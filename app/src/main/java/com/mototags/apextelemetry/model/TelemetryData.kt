@@ -38,10 +38,16 @@ data class TelemetryData(
     val speedKmh: Float = 0f,
     val maxSpeedKmh: Float = 0f,
     val avgSpeedKmh: Float = 0f,
+    val tripDistanceKm: Float = 0f,
     val movingTimeSeconds: Long = 0L,
     val rideDurationSeconds: Long = 0L,
     val isCalibrated: Boolean = false,
     val displayRotation: Int = 0,
     val isDrawerOpen: Boolean = false,
-    val showSummaryDialog: Boolean = false
+    val showSummaryDialog: Boolean = false,
+    val currentLatitude: Double = 0.0,
+    val currentLongitude: Double = 0.0,
+    val currentAltitude: Double = 0.0,
+    val sensorHealth: SensorHealth = SensorHealth(),
+    val recoveredRide: RideSession? = null
 )

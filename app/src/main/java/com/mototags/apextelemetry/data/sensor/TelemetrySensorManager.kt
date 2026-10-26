@@ -17,11 +17,15 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     private val linearAccelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
     private val gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
+    val isGyroAvailable: Boolean = gyroSensor != null
+    val isRotationVectorAvailable: Boolean = rotationVectorSensor != null
+
     var displayRotation: Int = Surface.ROTATION_0
     var invertDirection: Boolean = false
 
     var onLeanUpdated: ((leanAngle: Float) -> Unit)? = null
     var onGForceUpdated: ((lateralG: Float, longitudinalG: Float) -> Unit)? = null
+    var onSensorHealthUpdated: ((rateHz: Int, vibrationIndex: Float) -> Unit)? = null
 
     // Matrix buffers
     private val rawRotationMatrix = FloatArray(9)
@@ -38,7 +42,16 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     var isCalibrated: Boolean = false
         private set
 
-    // Adaptive smoothing: high responsiveness during dynamic flick, smooth during steady cornering
+    // Real-time sensor rate monitoring
+    private var sampleCount = 0
+    private var lastRateCalcTime = System.currentTimeMillis()
+    private var currentSensorRateHz = 0
+
+    // Mount vibration monitoring (detects loose phone mount)
+    private var accelVarianceSum = 0f
+    private var accelSampleCount = 0
+
+    // Adaptive smoothing
     private var smoothedLeanAngle: Float = 0f
     private var smoothedLateralG: Float = 0f
     private var smoothedLongitudinalG: Float = 0f
@@ -55,6 +68,8 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
         gyroSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
+        lastRateCalcTime = System.currentTimeMillis()
+        sampleCount = 0
     }
 
     fun stop() {
@@ -98,6 +113,19 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     }
 
     private fun handleRotationVector(values: FloatArray) {
+        // Monitor sensor update rate (Hz)
+        sampleCount++
+        val now = System.currentTimeMillis()
+        if (now - lastRateCalcTime >= 1000L) {
+            currentSensorRateHz = sampleCount
+            sampleCount = 0
+            val vibIndex = if (accelSampleCount > 0) (accelVarianceSum / accelSampleCount).coerceIn(0f, 1f) else 0f
+            accelVarianceSum = 0f
+            accelSampleCount = 0
+            lastRateCalcTime = now
+            onSensorHealthUpdated?.invoke(currentSensorRateHz, vibIndex)
+        }
+
         SensorManager.getRotationMatrixFromVector(rawRotationMatrix, values)
 
         // Remap hardware axes according to screen rotation
@@ -111,23 +139,16 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
         if (SensorManager.remapCoordinateSystem(rawRotationMatrix, axisX, axisY, remappedMatrix)) {
             synchronized(this) {
                 val targetRollDeg: Float = if (isCalibrated) {
-                    // Compute relative orientation: R_rel = R_tare^T * R_current
                     multiply3x3(tareInverseMatrix, remappedMatrix, relativeMatrix)
 
-                    // In the calibrated reference frame, the gravity vector is the 3rd row of R_rel
-                    // roll is angle in transverse-vertical plane
                     val gx = relativeMatrix[6]
                     val gy = relativeMatrix[7]
                     val gz = relativeMatrix[8]
 
-                    // Calculate roll angle around bike's longitudinal axis
                     val rollRad = atan2(gx.toDouble(), sqrt((gy * gy + gz * gz).toDouble()))
                     var deg = Math.toDegrees(rollRad).toFloat()
-
-                    // Ensure right turn is positive (+), left turn is negative (-)
                     if (invertDirection) -deg else deg
                 } else {
-                    // Pre-calibration preview
                     val gx = remappedMatrix[6]
                     val gy = remappedMatrix[7]
                     val gz = remappedMatrix[8]
@@ -136,9 +157,8 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
                     if (invertDirection) -deg else deg
                 }
 
-                // Dynamic adaptive low-pass filter
                 val delta = abs(targetRollDeg - smoothedLeanAngle)
-                val alpha = if (delta > 8f) 0.35f else 0.18f // fast tracking on quick transitions, smooth on cruise
+                val alpha = if (delta > 8f) 0.35f else 0.18f
                 smoothedLeanAngle = (alpha * targetRollDeg) + ((1f - alpha) * smoothedLeanAngle)
             }
 
@@ -156,6 +176,11 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
 
         val rawLatG = screenX / GRAVITY_MS2
         val rawLongG = screenY / GRAVITY_MS2
+
+        // Mount vibration tracking (magnitude variance)
+        val mag = sqrt((screenX * screenX + screenY * screenY).toDouble()).toFloat()
+        accelVarianceSum += abs(mag - 0.5f) / 10f
+        accelSampleCount++
 
         val alphaAccel = 0.20f
         smoothedLateralG = (alphaAccel * rawLatG) + ((1f - alphaAccel) * smoothedLateralG)

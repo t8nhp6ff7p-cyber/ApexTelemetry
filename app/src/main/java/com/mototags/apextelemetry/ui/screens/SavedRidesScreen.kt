@@ -16,12 +16,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TwoWheeler
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,6 +47,8 @@ import java.util.Locale
 fun SavedRidesScreen(
     rides: List<RideSession>,
     onDeleteRide: (String) -> Unit,
+    onExportGpx: (RideSession) -> Unit,
+    onExportCsv: (RideSession) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (rides.isEmpty()) {
@@ -67,7 +74,7 @@ fun SavedRidesScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Start a ride from the Cockpit HUD, ride your favorite twisties, and hit Save when you're done!",
+                    text = "Start a ride from the Cockpit HUD, ride your favorite twisties, and hit Save. Telemetry will be saved with GPX & CSV export ready!",
                     style = MaterialTheme.typography.bodyMedium,
                     color = SubtleGray,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -80,7 +87,7 @@ fun SavedRidesScreen(
                 .fillMaxSize()
                 .background(PureBlack)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
                 Text(
@@ -88,12 +95,17 @@ fun SavedRidesScreen(
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
 
             items(rides, key = { it.id }) { ride ->
-                RideCard(ride = ride, onDelete = { onDeleteRide(ride.id) })
+                RideCard(
+                    ride = ride,
+                    onDelete = { onDeleteRide(ride.id) },
+                    onExportGpx = { onExportGpx(ride) },
+                    onExportCsv = { onExportCsv(ride) }
+                )
             }
         }
     }
@@ -102,13 +114,16 @@ fun SavedRidesScreen(
 @Composable
 private fun RideCard(
     ride: RideSession,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onExportGpx: () -> Unit,
+    onExportCsv: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
     val dateStr = dateFormat.format(Date(ride.startTime))
     val minutes = ride.durationSeconds / 60
     val seconds = ride.durationSeconds % 60
     val durationStr = String.format(Locale.US, "%02d:%02d min", minutes, seconds)
+    val distanceStr = String.format(Locale.US, "%.1f km", ride.distanceKm)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -124,12 +139,12 @@ private fun RideCard(
                 Column {
                     Text(
                         text = ride.title,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Black
                     )
                     Text(
-                        text = "$dateStr • $durationStr",
+                        text = "$dateStr • $durationStr • $distanceStr",
                         style = MaterialTheme.typography.labelSmall,
                         color = SubtleGray
                     )
@@ -138,13 +153,13 @@ private fun RideCard(
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Ride",
+                        contentDescription = "Delete",
                         tint = SubtleGray
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Metrics Grid
             Row(
@@ -161,16 +176,44 @@ private fun RideCard(
                 )
                 Box(modifier = Modifier.width(1.dp).height(32.dp).background(SubtleGray.copy(alpha = 0.3f)))
                 MetricColumn(
-                    label = "TOP SPEED",
-                    value = "${ride.maxSpeedKmh.toInt()} km/h",
+                    label = "AVG / TOP",
+                    value = "${ride.avgSpeedKmh.toInt()} / ${ride.maxSpeedKmh.toInt()} km/h",
                     highlightColor = MaterialTheme.colorScheme.secondary
                 )
                 Box(modifier = Modifier.width(1.dp).height(32.dp).background(SubtleGray.copy(alpha = 0.3f)))
                 MetricColumn(
-                    label = "MAX LAT G",
-                    value = String.format(Locale.US, "%.2fg", ride.maxLateralG),
+                    label = "MAX BRAKE",
+                    value = String.format(Locale.US, "%.2fg", ride.maxBrakeG),
                     highlightColor = Color.White
                 )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Export Actions (GPX & CSV)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onExportGpx,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.weight(1f).height(40.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("EXPORT GPX", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = onExportCsv,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    modifier = Modifier.weight(1f).height(40.dp)
+                ) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("EXPORT CSV", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

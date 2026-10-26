@@ -4,14 +4,18 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mototags.apextelemetry.data.database.RideRepository
+import com.mototags.apextelemetry.data.export.RideExporter
 import com.mototags.apextelemetry.data.location.LocationService
 import com.mototags.apextelemetry.data.sensor.TelemetrySensorManager
 import com.mototags.apextelemetry.model.DisplayStyle
+import com.mototags.apextelemetry.model.GpsQuality
 import com.mototags.apextelemetry.model.LeanScale
 import com.mototags.apextelemetry.model.RideSession
 import com.mototags.apextelemetry.model.RideState
+import com.mototags.apextelemetry.model.SensorHealth
 import com.mototags.apextelemetry.model.SpeedUnit
 import com.mototags.apextelemetry.model.TelemetryData
+import com.mototags.apextelemetry.model.TelemetryPoint
 import com.mototags.apextelemetry.ui.theme.AppTheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,6 +33,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     private val sensorManager = TelemetrySensorManager(application)
     private val locationService = LocationService(application)
     private val rideRepository = RideRepository(application)
+    private val rideExporter = RideExporter(application)
 
     private val _telemetryState = MutableStateFlow(TelemetryData())
     val telemetryState: StateFlow<TelemetryData> = _telemetryState.asStateFlow()
@@ -41,9 +46,33 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     private var speedCount = 0L
     private var rideStartTime = 0L
 
+    // In-memory telemetry log buffer for active ride
+    private val recordedPoints = mutableListOf<TelemetryPoint>()
+    private var lastWalSaveTime = 0L
+
     init {
         setupListeners()
         loadSavedRides()
+        checkCrashRecovery()
+    }
+
+    private fun checkCrashRecovery() {
+        val unfinished = rideRepository.getUnfinishedRideWal()
+        if (unfinished != null && unfinished.durationSeconds > 10L) {
+            _telemetryState.update { it.copy(recoveredRide = unfinished) }
+        }
+    }
+
+    fun dismissRecovery() {
+        rideRepository.clearActiveRideWal()
+        _telemetryState.update { it.copy(recoveredRide = null) }
+    }
+
+    fun saveRecoveredRide() {
+        val recovered = _telemetryState.value.recoveredRide ?: return
+        rideRepository.saveRide(recovered)
+        loadSavedRides()
+        _telemetryState.update { it.copy(recoveredRide = null) }
     }
 
     private fun setupListeners() {
@@ -90,36 +119,95 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        locationService.onSpeedUpdated = { speedKmh ->
+        sensorManager.onSensorHealthUpdated = { hz, vibrationIndex ->
             _telemetryState.update { current ->
-                if (current.rideState == RideState.RIDING) {
-                    val newMax = max(current.maxSpeedKmh, speedKmh)
-                    if (speedKmh > 3.0f) {
-                        speedSumKmh += speedKmh
-                        speedCount++
-                    }
-                    val newAvg = if (speedCount > 0) (speedSumKmh / speedCount).toFloat() else 0f
-
-                    current.copy(
-                        speedKmh = speedKmh,
-                        maxSpeedKmh = newMax,
-                        avgSpeedKmh = newAvg
+                current.copy(
+                    sensorHealth = current.sensorHealth.copy(
+                        sensorRateHz = hz,
+                        mountVibrationLevel = vibrationIndex
                     )
-                } else {
-                    current.copy(speedKmh = speedKmh)
+                )
+            }
+        }
+
+        locationService.onTelemetryLocation = { lat, lon, alt, speedKmh, accuracy, deltaDistKm, quality ->
+            _telemetryState.update { current ->
+                val newDist = current.tripDistanceKm + (if (current.rideState == RideState.RIDING) deltaDistKm else 0f)
+                val newMax = if (current.rideState == RideState.RIDING) max(current.maxSpeedKmh, speedKmh) else current.maxSpeedKmh
+
+                if (current.rideState == RideState.RIDING && speedKmh > 3.0f) {
+                    speedSumKmh += speedKmh
+                    speedCount++
                 }
+                val newAvg = if (speedCount > 0) (speedSumKmh / speedCount).toFloat() else 0f
+
+                // Record telemetry point if active
+                if (current.rideState == RideState.RIDING) {
+                    val pt = TelemetryPoint(
+                        timestamp = System.currentTimeMillis(),
+                        speedKmh = speedKmh,
+                        leanAngle = current.currentLeanAngle,
+                        lateralG = current.lateralG,
+                        longitudinalG = current.longitudinalG,
+                        latitude = lat,
+                        longitude = lon,
+                        altitude = alt
+                    )
+                    synchronized(recordedPoints) {
+                        recordedPoints.add(pt)
+                    }
+
+                    // Periodic Write-Ahead Logging (WAL) every 5 seconds
+                    val now = System.currentTimeMillis()
+                    if (now - lastWalSaveTime > 5000L) {
+                        lastWalSaveTime = now
+                        val currentSession = RideSession(
+                            id = rideStartTime.toString(),
+                            title = "In-Progress Ride",
+                            startTime = rideStartTime,
+                            endTime = now,
+                            durationSeconds = current.rideDurationSeconds,
+                            movingDurationSeconds = current.movingTimeSeconds,
+                            distanceKm = newDist,
+                            maxLeftLean = current.maxLeftLean,
+                            maxRightLean = current.maxRightLean,
+                            maxSpeedKmh = newMax,
+                            avgSpeedKmh = newAvg,
+                            maxLateralG = current.maxLateralG,
+                            maxBrakeG = current.maxBrakeG,
+                            points = ArrayList(recordedPoints)
+                        )
+                        rideRepository.saveActiveRideWal(currentSession)
+                    }
+                }
+
+                current.copy(
+                    currentLatitude = lat,
+                    currentLongitude = lon,
+                    currentAltitude = alt,
+                    speedKmh = speedKmh,
+                    maxSpeedKmh = newMax,
+                    avgSpeedKmh = newAvg,
+                    tripDistanceKm = newDist,
+                    sensorHealth = current.sensorHealth.copy(
+                        gpsAccuracyMeters = accuracy,
+                        gpsQuality = quality,
+                        totalDistanceKm = newDist
+                    )
+                )
             }
         }
     }
 
-    /**
-     * Start Ride WITHOUT forced auto-calibration.
-     * Rider has full manual control over when to zero/calibrate.
-     */
     fun startRide() {
         speedSumKmh = 0.0
         speedCount = 0L
         rideStartTime = System.currentTimeMillis()
+        lastWalSaveTime = rideStartTime
+        locationService.resetDistanceTracking()
+        synchronized(recordedPoints) {
+            recordedPoints.clear()
+        }
 
         _telemetryState.update { current ->
             current.copy(
@@ -131,6 +219,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                 maxBrakeG = 0f,
                 maxSpeedKmh = 0f,
                 avgSpeedKmh = 0f,
+                tripDistanceKm = 0f,
                 rideDurationSeconds = 0L,
                 movingTimeSeconds = 0L,
                 isDrawerOpen = false
@@ -157,17 +246,25 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun saveCurrentRide(title: String) {
         val state = _telemetryState.value
+        val ptsCopy: List<TelemetryPoint>
+        synchronized(recordedPoints) {
+            ptsCopy = ArrayList(recordedPoints)
+        }
+
         val ride = RideSession(
             title = if (title.isBlank()) "Ride Session #${_savedRides.value.size + 1}" else title,
             startTime = rideStartTime,
             endTime = System.currentTimeMillis(),
             durationSeconds = state.rideDurationSeconds,
+            movingDurationSeconds = state.movingTimeSeconds,
+            distanceKm = state.tripDistanceKm,
             maxLeftLean = state.maxLeftLean,
             maxRightLean = state.maxRightLean,
             maxSpeedKmh = state.maxSpeedKmh,
             avgSpeedKmh = state.avgSpeedKmh,
             maxLateralG = state.maxLateralG,
-            maxBrakeG = state.maxBrakeG
+            maxBrakeG = state.maxBrakeG,
+            points = ptsCopy
         )
 
         rideRepository.saveRide(ride)
@@ -176,6 +273,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun discardRide() {
+        rideRepository.clearActiveRideWal()
         _telemetryState.update { it.copy(rideState = RideState.READY, showSummaryDialog = false) }
     }
 
@@ -184,9 +282,16 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         loadSavedRides()
     }
 
-    /**
-     * MANUAL ZERO CALIBRATION
-     */
+    fun exportRideGpx(ride: RideSession) {
+        val file = rideExporter.exportToGpx(ride)
+        rideExporter.shareFile(file, "application/gpx+xml")
+    }
+
+    fun exportRideCsv(ride: RideSession) {
+        val file = rideExporter.exportToCsv(ride)
+        rideExporter.shareFile(file, "text/csv")
+    }
+
     fun calibrateManual() {
         sensorManager.calibrateZero()
         _telemetryState.update { it.copy(isCalibrated = true) }
