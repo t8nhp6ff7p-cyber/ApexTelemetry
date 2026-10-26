@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mototags.apextelemetry.model.LeanScale
+import com.mototags.apextelemetry.model.SpeedUnit
 import com.mototags.apextelemetry.ui.theme.ArcTrackColor
 import com.mototags.apextelemetry.ui.theme.DarkCard
 import com.mototags.apextelemetry.ui.theme.DarkSurface
@@ -42,17 +44,22 @@ fun RallyTwinGauge(
     maxRight: Float,
     speedKmh: Float,
     maxSpeedKmh: Float,
+    avgSpeedKmh: Float,
+    leanScale: LeanScale,
+    speedUnit: SpeedUnit,
     primaryColor: Color = MaterialTheme.colorScheme.primary,
     secondaryColor: Color = MaterialTheme.colorScheme.secondary,
     modifier: Modifier = Modifier
 ) {
+    val maxLimit = leanScale.maxDegrees.toFloat()
     val animatedLean by animateFloatAsState(
-        targetValue = currentLean.coerceIn(-65f, 65f),
+        targetValue = currentLean.coerceIn(-maxLimit, maxLimit),
         animationSpec = spring(stiffness = 800f),
         label = "RallyLean"
     )
+    val displaySpeed = speedKmh * speedUnit.factorToKmh
     val animatedSpeed by animateFloatAsState(
-        targetValue = speedKmh.coerceIn(0f, 220f),
+        targetValue = displaySpeed.coerceIn(0f, 220f),
         animationSpec = spring(stiffness = 700f),
         label = "RallySpeed"
     )
@@ -69,8 +76,8 @@ fun RallyTwinGauge(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = "ROLL ANGLE", style = MaterialTheme.typography.labelSmall, color = SubtleGray)
             Spacer(modifier = Modifier.height(4.dp))
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(130.dp)) {
-                Canvas(modifier = Modifier.size(120.dp)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(135.dp)) {
+                Canvas(modifier = Modifier.size(125.dp)) {
                     val center = Offset(size.width / 2f, size.height / 2f)
                     val radius = size.width / 2f - 4.dp.toPx()
 
@@ -78,14 +85,14 @@ fun RallyTwinGauge(
                     drawCircle(color = ArcTrackColor, radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
 
                     val zeroAngle = 270f
-                    val needleAngle = zeroAngle + animatedLean
+                    val angleScale = 140f / (maxLimit * 2f)
+                    val needleAngle = zeroAngle + (animatedLean * angleScale)
                     val needleRad = Math.toRadians(needleAngle.toDouble())
                     val end = Offset(
                         center.x + (radius - 10.dp.toPx()) * cos(needleRad).toFloat(),
                         center.y + (radius - 10.dp.toPx()) * sin(needleRad).toFloat()
                     )
 
-                    // Draw tick at 0 (straight up)
                     drawLine(
                         color = Color.White,
                         start = Offset(center.x, center.y - radius),
@@ -125,15 +132,14 @@ fun RallyTwinGauge(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = "SPEED", style = MaterialTheme.typography.labelSmall, color = SubtleGray)
             Spacer(modifier = Modifier.height(4.dp))
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(130.dp)) {
-                Canvas(modifier = Modifier.size(120.dp)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(135.dp)) {
+                Canvas(modifier = Modifier.size(125.dp)) {
                     val center = Offset(size.width / 2f, size.height / 2f)
                     val radius = size.width / 2f - 4.dp.toPx()
 
                     drawCircle(color = DarkCard, radius = radius, center = center)
                     drawCircle(color = ArcTrackColor, radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
 
-                    // Speed sweep from 140° to 400° (260 degree arc)
                     val startAngle = 140f
                     val sweep = (animatedSpeed / 200f) * 260f
                     val speedRad = Math.toRadians((startAngle + sweep).toDouble())
@@ -154,11 +160,13 @@ fun RallyTwinGauge(
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 36.dp)) {
                     Text(text = "${animatedSpeed.toInt()}", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Black)
-                    Text(text = "KM/H", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = SubtleGray, fontWeight = FontWeight.Bold)
+                    Text(text = speedUnit.label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = SubtleGray, fontWeight = FontWeight.Bold)
                 }
             }
+            val displayMax = (maxSpeedKmh * speedUnit.factorToKmh).toInt()
+            val displayAvg = (avgSpeedKmh * speedUnit.factorToKmh).toInt()
             Text(
-                text = "TOP: ${maxSpeedKmh.toInt()} km/h",
+                text = "AVG $displayAvg | TOP $displayMax ${speedUnit.label.lowercase()}",
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                 color = secondaryColor,
                 fontWeight = FontWeight.Bold

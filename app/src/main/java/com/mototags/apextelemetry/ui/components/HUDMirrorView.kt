@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mototags.apextelemetry.model.SpeedUnit
 import com.mototags.apextelemetry.ui.theme.DarkSurface
 import com.mototags.apextelemetry.ui.theme.SubtleGray
 import kotlin.math.abs
@@ -31,17 +32,19 @@ fun HUDMirrorView(
     speedKmh: Float,
     maxLeft: Float,
     maxRight: Float,
+    speedUnit: SpeedUnit,
     primaryColor: Color = MaterialTheme.colorScheme.primary,
     secondaryColor: Color = MaterialTheme.colorScheme.secondary,
     modifier: Modifier = Modifier
 ) {
-    // Horizontally mirrored graphicsLayer for windshield reflection projection (Speedometer 55 HUD mode)
+    val displaySpeed = (speedKmh * speedUnit.factorToKmh).toInt()
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .graphicsLayer(scaleX = -1f) // Mirror horizontal
+            .graphicsLayer(scaleX = -1f) // Mirror horizontal for windshield reflection
             .background(DarkSurface, RoundedCornerShape(20.dp))
-            .padding(20.dp),
+            .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -50,7 +53,7 @@ fun HUDMirrorView(
             modifier = Modifier.fillMaxSize()
         ) {
             Text(
-                text = "HUD WINDSHIELD REFLECTION",
+                text = "WINDSHIELD REFLECTION HUD",
                 style = MaterialTheme.typography.labelSmall,
                 color = SubtleGray
             )
@@ -58,13 +61,13 @@ fun HUDMirrorView(
             // Giant Speed
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "${speedKmh.toInt()}",
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 90.sp),
+                    text = "$displaySpeed",
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 94.sp),
                     color = primaryColor,
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    text = "KM/H",
+                    text = speedUnit.label,
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -73,7 +76,7 @@ fun HUDMirrorView(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Giant Lean Readout
+            // Peak and live angles
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround,
@@ -89,11 +92,11 @@ fun HUDMirrorView(
                     val dir = if (currentLean < -1.5f) "◄ L" else if (currentLean > 1.5f) "R ►" else "UP"
                     Text(
                         text = "$leanAbs° $dir",
-                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 46.sp),
+                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp),
                         color = Color.White,
                         fontWeight = FontWeight.Black
                     )
-                    Text(text = "LEAN ANGLE", style = MaterialTheme.typography.labelSmall, color = primaryColor, fontWeight = FontWeight.Bold)
+                    Text(text = "ROLL ANGLE", style = MaterialTheme.typography.labelSmall, color = primaryColor, fontWeight = FontWeight.Bold)
                 }
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

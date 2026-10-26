@@ -15,6 +15,9 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.mototags.apextelemetry.ui.HUDDashboardScreen
 import com.mototags.apextelemetry.ui.TelemetryViewModel
 import com.mototags.apextelemetry.ui.theme.ApexTelemetryTheme
@@ -42,6 +45,9 @@ class MainActivity : ComponentActivity() {
         // Keep screen awake while mounted on motorcycle handlebars
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // True Immersive Sticky Fullscreen (Hide Status Bar & Navigation Bar)
+        enableImmersiveFullscreen()
+
         // Listen for hardware auto-rotation changes
         setupOrientationListener()
         updateDisplayRotation()
@@ -55,6 +61,14 @@ class MainActivity : ComponentActivity() {
                 HUDDashboardScreen(viewModel = viewModel)
             }
         }
+    }
+
+    private fun enableImmersiveFullscreen() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
     }
 
     private fun setupOrientationListener() {
@@ -96,6 +110,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        enableImmersiveFullscreen()
         orientationEventListener?.enable()
         viewModel.startTelemetry()
         updateDisplayRotation()
@@ -107,8 +122,16 @@ class MainActivity : ComponentActivity() {
         viewModel.stopTelemetry()
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enableImmersiveFullscreen()
+        }
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        enableImmersiveFullscreen()
         updateDisplayRotation()
     }
 }

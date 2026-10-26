@@ -3,16 +3,29 @@ package com.mototags.apextelemetry.model
 import com.mototags.apextelemetry.ui.theme.AppTheme
 
 enum class DisplayStyle(val title: String, val subtitle: String) {
-    DIGITAL_MOTO("Digital Moto", "MotoGP Telemetry HUD"),
-    ANALOG_DIAL("Analog Dial", "Classic Needle Gauge"),
-    RALLY_TWIN("Rally Twin", "Dual Instrument Binnacle"),
-    HUD_MIRROR("HUD Mirror", "Windshield Reflection Mode")
+    ANALOG_DIAL("Classic Analog", "Precision Needle Dial"),
+    DIGITAL_MOTO("MotoGP Digital", "Segmented Arc Telemetry"),
+    RALLY_TWIN("Rally Twin Pods", "Dual Gauge Binnacle"),
+    HUD_MIRROR("HUD Windshield", "Flipped Night Projection")
+}
+
+enum class LeanScale(val maxDegrees: Int, val label: String) {
+    STREET_45(45, "45° (Street / Cruiser)"),
+    SPORT_55(55, "55° (Sport / Twisties)"),
+    TRACK_65(65, "65° (Track / MotoGP)")
+}
+
+enum class SpeedUnit(val label: String, val factorToKmh: Float) {
+    KMH("KM/H", 1.0f),
+    MPH("MPH", 0.621371f)
 }
 
 data class TelemetryData(
     val rideState: RideState = RideState.READY,
     val selectedTheme: AppTheme = AppTheme.MOTOGP_CYAN,
-    val displayStyle: DisplayStyle = DisplayStyle.DIGITAL_MOTO,
+    val displayStyle: DisplayStyle = DisplayStyle.ANALOG_DIAL,
+    val leanScale: LeanScale = LeanScale.SPORT_55,
+    val speedUnit: SpeedUnit = SpeedUnit.KMH,
     val isInvertedDirection: Boolean = false,
     val currentLeanAngle: Float = 0f,
     val maxLeftLean: Float = 0f,
@@ -25,8 +38,10 @@ data class TelemetryData(
     val speedKmh: Float = 0f,
     val maxSpeedKmh: Float = 0f,
     val avgSpeedKmh: Float = 0f,
+    val movingTimeSeconds: Long = 0L,
     val rideDurationSeconds: Long = 0L,
     val isCalibrated: Boolean = false,
     val displayRotation: Int = 0,
-    val activeTab: Int = 0 // 0: Cockpit HUD, 1: Saved Rides History
+    val isDrawerOpen: Boolean = false,
+    val showSummaryDialog: Boolean = false
 )

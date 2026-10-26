@@ -6,6 +6,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.view.Surface
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
@@ -17,6 +18,7 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     private val gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
     var displayRotation: Int = Surface.ROTATION_0
+    var invertDirection: Boolean = false
 
     var onLeanUpdated: ((leanAngle: Float) -> Unit)? = null
     var onGForceUpdated: ((lateralG: Float, longitudinalG: Float) -> Unit)? = null
@@ -25,24 +27,18 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     private val rawRotationMatrix = FloatArray(9)
     private val remappedMatrix = FloatArray(9)
     
-    // Mount calibration baseline matrix (Identity by default)
+    // Baseline mount attitude matrix (Identity by default)
     private val tareInverseMatrix = floatArrayOf(
         1f, 0f, 0f,
         0f, 1f, 0f,
         0f, 0f, 1f
     )
     private val relativeMatrix = FloatArray(9)
-    private val orientationAngles = FloatArray(3)
 
     var isCalibrated: Boolean = false
         private set
 
-    var invertDirection: Boolean = false
-
-    // Vibration low-pass filter
-    private val alphaLean = 0.22f
-    private val alphaAccel = 0.18f
-
+    // Adaptive smoothing: high responsiveness during dynamic flick, smooth during steady cornering
     private var smoothedLeanAngle: Float = 0f
     private var smoothedLateralG: Float = 0f
     private var smoothedLongitudinalG: Float = 0f
@@ -66,12 +62,12 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     }
 
     /**
-     * Tares current bike mount orientation as the true upright 0° reference.
-     * Computes the transpose (inverse) of the current rotation matrix.
+     * MANUAL CALIBRATION:
+     * User holds motorcycle upright and taps "Tare Horizon / Calibrate".
+     * Stores the inverse (transpose) of the current mount rotation matrix.
      */
     fun calibrateZero() {
         synchronized(this) {
-            // Transpose remappedMatrix into tareInverseMatrix
             for (i in 0..2) {
                 for (j in 0..2) {
                     tareInverseMatrix[i * 3 + j] = remappedMatrix[j * 3 + i]
@@ -104,7 +100,7 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     private fun handleRotationVector(values: FloatArray) {
         SensorManager.getRotationMatrixFromVector(rawRotationMatrix, values)
 
-        // Remap hardware axes according to current screen orientation
+        // Remap hardware axes according to screen rotation
         val (axisX, axisY) = when (displayRotation) {
             Surface.ROTATION_90 -> Pair(SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X)
             Surface.ROTATION_180 -> Pair(SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y)
@@ -114,34 +110,36 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
 
         if (SensorManager.remapCoordinateSystem(rawRotationMatrix, axisX, axisY, remappedMatrix)) {
             synchronized(this) {
-                if (isCalibrated) {
-                    // Multiply: relativeMatrix = tareInverseMatrix * remappedMatrix
+                val targetRollDeg: Float = if (isCalibrated) {
+                    // Compute relative orientation: R_rel = R_tare^T * R_current
                     multiply3x3(tareInverseMatrix, remappedMatrix, relativeMatrix)
 
-                    // Extract pure roll angle from relative matrix
-                    // Invert default sign so leaning right is positive (+), leaning left is negative (-)
-                    val rollRad = atan2(relativeMatrix[6].toDouble(), relativeMatrix[7].toDouble())
-                    var rollDeg = -Math.toDegrees(rollRad).toFloat()
+                    // In the calibrated reference frame, the gravity vector is the 3rd row of R_rel
+                    // roll is angle in transverse-vertical plane
+                    val gx = relativeMatrix[6]
+                    val gy = relativeMatrix[7]
+                    val gz = relativeMatrix[8]
 
-                    // Normalize to -180..180
-                    if (rollDeg > 180f) rollDeg -= 360f
-                    if (rollDeg < -180f) rollDeg += 360f
+                    // Calculate roll angle around bike's longitudinal axis
+                    val rollRad = atan2(gx.toDouble(), sqrt((gy * gy + gz * gz).toDouble()))
+                    var deg = Math.toDegrees(rollRad).toFloat()
 
-                    if (invertDirection) {
-                        rollDeg = -rollDeg
-                    }
-
-                    val targetAngle = rollDeg.coerceIn(-75f, 75f)
-                    smoothedLeanAngle = (alphaLean * targetAngle) + ((1f - alphaLean) * smoothedLeanAngle)
+                    // Ensure right turn is positive (+), left turn is negative (-)
+                    if (invertDirection) -deg else deg
                 } else {
-                    // When untared, compute preview roll (inverted to match bike orientation)
-                    SensorManager.getOrientation(remappedMatrix, orientationAngles)
-                    var rawRoll = -Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
-                    if (invertDirection) {
-                        rawRoll = -rawRoll
-                    }
-                    smoothedLeanAngle = (alphaLean * rawRoll) + ((1f - alphaLean) * smoothedLeanAngle)
+                    // Pre-calibration preview
+                    val gx = remappedMatrix[6]
+                    val gy = remappedMatrix[7]
+                    val gz = remappedMatrix[8]
+                    val rollRad = atan2(gx.toDouble(), sqrt((gy * gy + gz * gz).toDouble()))
+                    var deg = Math.toDegrees(rollRad).toFloat()
+                    if (invertDirection) -deg else deg
                 }
+
+                // Dynamic adaptive low-pass filter
+                val delta = abs(targetRollDeg - smoothedLeanAngle)
+                val alpha = if (delta > 8f) 0.35f else 0.18f // fast tracking on quick transitions, smooth on cruise
+                smoothedLeanAngle = (alpha * targetRollDeg) + ((1f - alpha) * smoothedLeanAngle)
             }
 
             onLeanUpdated?.invoke(smoothedLeanAngle)
@@ -159,6 +157,7 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
         val rawLatG = screenX / GRAVITY_MS2
         val rawLongG = screenY / GRAVITY_MS2
 
+        val alphaAccel = 0.20f
         smoothedLateralG = (alphaAccel * rawLatG) + ((1f - alphaAccel) * smoothedLateralG)
         smoothedLongitudinalG = (alphaAccel * rawLongG) + ((1f - alphaAccel) * smoothedLongitudinalG)
 

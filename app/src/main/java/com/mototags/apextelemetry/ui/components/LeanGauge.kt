@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mototags.apextelemetry.model.LeanScale
 import com.mototags.apextelemetry.ui.theme.ArcTrackColor
 import com.mototags.apextelemetry.ui.theme.NeonRed
 import com.mototags.apextelemetry.ui.theme.SubtleGray
@@ -37,12 +38,14 @@ fun LeanGauge(
     currentLean: Float,
     maxLeft: Float,
     maxRight: Float,
+    leanScale: LeanScale,
     primaryColor: Color = MaterialTheme.colorScheme.primary,
     secondaryColor: Color = MaterialTheme.colorScheme.secondary,
     modifier: Modifier = Modifier
 ) {
+    val maxLimit = leanScale.maxDegrees.toFloat()
     val animatedLean by animateFloatAsState(
-        targetValue = currentLean.coerceIn(-65f, 65f),
+        targetValue = currentLean.coerceIn(-maxLimit, maxLimit),
         animationSpec = spring(stiffness = 850f),
         label = "LeanAngleAnimation"
     )
@@ -51,7 +54,7 @@ fun LeanGauge(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
     ) {
-        // Peak Indicators Row
+        // Peak Readouts Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -59,11 +62,7 @@ fun LeanGauge(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(horizontalAlignment = Alignment.Start) {
-                Text(
-                    text = "MAX LEFT",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = SubtleGray
-                )
+                Text(text = "PEAK LEFT", style = MaterialTheme.typography.labelSmall, color = SubtleGray)
                 Text(
                     text = "${maxLeft.toInt()}°",
                     style = MaterialTheme.typography.titleLarge,
@@ -75,11 +74,7 @@ fun LeanGauge(
             Spacer(modifier = Modifier.weight(1f))
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "MAX RIGHT",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = SubtleGray
-                )
+                Text(text = "PEAK RIGHT", style = MaterialTheme.typography.labelSmall, color = SubtleGray)
                 Text(
                     text = "${maxRight.toInt()}°",
                     style = MaterialTheme.typography.titleLarge,
@@ -91,7 +86,6 @@ fun LeanGauge(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Center Arc Gauge Canvas
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(280.dp, 160.dp)
@@ -104,8 +98,9 @@ fun LeanGauge(
                 val startAngle = 210f
                 val sweepTotal = 120f
                 val zeroAngle = 270f
+                val scaleFactor = (sweepTotal / 2f) / maxLimit
 
-                // Track Background
+                // Background Segmented Arc Track
                 drawArc(
                     color = ArcTrackColor,
                     startAngle = startAngle,
@@ -116,27 +111,7 @@ fun LeanGauge(
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
-                // Tick marks at 15°, 30°, 45°
-                for (tickDeg in listOf(-45, -30, -15, 15, 30, 45)) {
-                    val angle = zeroAngle + tickDeg
-                    val rad = Math.toRadians(angle.toDouble())
-                    val tStart = Offset(
-                        centerOffset.x + (radius - strokeWidth / 2) * cos(rad).toFloat(),
-                        centerOffset.y + (radius - strokeWidth / 2) * sin(rad).toFloat()
-                    )
-                    val tEnd = Offset(
-                        centerOffset.x + (radius + strokeWidth / 2) * cos(rad).toFloat(),
-                        centerOffset.y + (radius + strokeWidth / 2) * sin(rad).toFloat()
-                    )
-                    drawLine(
-                        color = SubtleGray.copy(alpha = 0.5f),
-                        start = tStart,
-                        end = tEnd,
-                        strokeWidth = 2.dp.toPx()
-                    )
-                }
-
-                // Center Zero Notch
+                // Zero Center Notch
                 val zeroRad = Math.toRadians(zeroAngle.toDouble())
                 val zeroStart = Offset(
                     centerOffset.x + (radius - strokeWidth / 2) * cos(zeroRad).toFloat(),
@@ -146,62 +121,57 @@ fun LeanGauge(
                     centerOffset.x + (radius + strokeWidth / 2) * cos(zeroRad).toFloat(),
                     centerOffset.y + (radius + strokeWidth / 2) * sin(zeroRad).toFloat()
                 )
-                drawLine(
-                    color = Color.White,
-                    start = zeroStart,
-                    end = zeroEnd,
-                    strokeWidth = 3.dp.toPx()
-                )
+                drawLine(color = Color.White, start = zeroStart, end = zeroEnd, strokeWidth = 3.dp.toPx())
 
-                // Live Lean Arc
+                // Dynamic Live Lean Sweep
+                val leanSweepAngle = animatedLean * scaleFactor
                 val leanColor = when {
-                    abs(animatedLean) > 52f -> NeonRed
-                    abs(animatedLean) > 38f -> secondaryColor
+                    abs(animatedLean) > (maxLimit * 0.85f) -> NeonRed
+                    abs(animatedLean) > (maxLimit * 0.65f) -> secondaryColor
                     else -> primaryColor
                 }
 
                 drawArc(
                     color = leanColor,
                     startAngle = zeroAngle,
-                    sweepAngle = animatedLean,
+                    sweepAngle = leanSweepAngle,
                     useCenter = false,
                     topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f),
                     size = Size(radius * 2, radius * 2),
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
-                // Left Peak Notch
+                // Left Peak Marker
                 if (maxLeft > 0f) {
-                    val peakLeftAngle = zeroAngle - maxLeft.coerceAtMost(60f)
-                    val rad = Math.toRadians(peakLeftAngle.toDouble())
+                    val pAngle = zeroAngle - (maxLeft.coerceAtMost(maxLimit) * scaleFactor)
+                    val pRad = Math.toRadians(pAngle.toDouble())
                     val pStart = Offset(
-                        centerOffset.x + (radius - strokeWidth / 2) * cos(rad).toFloat(),
-                        centerOffset.y + (radius - strokeWidth / 2) * sin(rad).toFloat()
+                        centerOffset.x + (radius - strokeWidth / 2) * cos(pRad).toFloat(),
+                        centerOffset.y + (radius - strokeWidth / 2) * sin(pRad).toFloat()
                     )
                     val pEnd = Offset(
-                        centerOffset.x + (radius + strokeWidth / 2) * cos(rad).toFloat(),
-                        centerOffset.y + (radius + strokeWidth / 2) * sin(rad).toFloat()
+                        centerOffset.x + (radius + strokeWidth / 2) * cos(pRad).toFloat(),
+                        centerOffset.y + (radius + strokeWidth / 2) * sin(pRad).toFloat()
                     )
                     drawLine(color = secondaryColor, start = pStart, end = pEnd, strokeWidth = 4.dp.toPx())
                 }
 
-                // Right Peak Notch
+                // Right Peak Marker
                 if (maxRight > 0f) {
-                    val peakRightAngle = zeroAngle + maxRight.coerceAtMost(60f)
-                    val rad = Math.toRadians(peakRightAngle.toDouble())
+                    val pAngle = zeroAngle + (maxRight.coerceAtMost(maxLimit) * scaleFactor)
+                    val pRad = Math.toRadians(pAngle.toDouble())
                     val pStart = Offset(
-                        centerOffset.x + (radius - strokeWidth / 2) * cos(rad).toFloat(),
-                        centerOffset.y + (radius - strokeWidth / 2) * sin(rad).toFloat()
+                        centerOffset.x + (radius - strokeWidth / 2) * cos(pRad).toFloat(),
+                        centerOffset.y + (radius - strokeWidth / 2) * sin(pRad).toFloat()
                     )
                     val pEnd = Offset(
-                        centerOffset.x + (radius + strokeWidth / 2) * cos(rad).toFloat(),
-                        centerOffset.y + (radius + strokeWidth / 2) * sin(rad).toFloat()
+                        centerOffset.x + (radius + strokeWidth / 2) * cos(pRad).toFloat(),
+                        centerOffset.y + (radius + strokeWidth / 2) * sin(pRad).toFloat()
                     )
                     drawLine(color = secondaryColor, start = pStart, end = pEnd, strokeWidth = 4.dp.toPx())
                 }
             }
 
-            // Central Readout
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(top = 42.dp)
@@ -222,7 +192,7 @@ fun LeanGauge(
                 Text(
                     text = direction,
                     style = MaterialTheme.typography.titleLarge,
-                    color = if (leanAbs > 38) secondaryColor else primaryColor,
+                    color = if (leanAbs > (maxLimit * 0.65f)) secondaryColor else primaryColor,
                     fontWeight = FontWeight.Bold
                 )
             }

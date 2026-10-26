@@ -34,38 +34,37 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release-apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v1.2.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v2.0.0.apk
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ApexTelemetry-v1.2.0-apk
-          path: release-apk/ApexTelemetry-v1.2.0.apk
+          name: ApexTelemetry-v2.0.0-apk
+          path: release-apk/ApexTelemetry-v2.0.0.apk
           retention-days: 30
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v1.2.0
-          name: "ApexTelemetry v1.2.0 - Speedometer∞ Display Cluster & Inversion Fix"
+          tag_name: v2.0.0
+          name: "ApexTelemetry v2.0.0 - Full-Fledged Application Revamp"
           body: |
-            ### 🏍️ ApexTelemetry v1.2.0 (Speedometer 55 / Speedometer∞ Edition)
+            ### 🏍️ ApexTelemetry v2.0.0 (Full-Fledged Application Experience)
             Motorcycle Lean & G-Force Telemetry HUD (Optimized for Samsung Galaxy S20 FE).
 
-            #### What's New in v1.2.0:
-            - **Direction Reversed Fix:** Leaning right sweeps right (+), leaning left sweeps left (-).
-            - **On-Screen Direction Invert Toggle:** Direct toggle `[ DIR: NORMAL / INVERTED ]` for inverted mountings.
-            - **4 Distinct Gauge Cluster Displays (Speedometer∞ reference):**
-              1. **Digital Moto:** Modern MotoGP telemetry arc with segmented sweep and digital readouts.
-              2. **Analog Dial:** Classic physical round gauge cluster with sweeping needle, tick marks, and persistent peak needles.
-              3. **Rally Twin:** Dual binnacle instruments (Left: Roll Angle Dial, Right: Speedometer Dial).
-              4. **HUD Mirror Mode:** Windshield mirror reflection projection mode (flipped horizontally) for night riding.
-            - **Theme Engine:** Integrated across all 4 gauge clusters.
-            - **Ride Recording & Saved Logs:** Start/Pause/Finish ride sessions with local persistence.
+            #### What's New in v2.0.0:
+            - **True Immersive Sticky Fullscreen:** System bars and navigation pill hidden for an edge-to-edge 120Hz Super AMOLED cockpit.
+            - **Options & Settings Drawer (☰):** Comprehensive slide-out menu for all cockpit customizations.
+            - **Aerospace 3D Quaternion Gravity Fusion:** Fixed lean angle calculation with pitch decoupling and dynamic adaptive filtering.
+            - **Dedicated Manual Calibration:** Removed forced auto-calibration on ride start; full manual "Tare Zero" control with 1-tap header shortcut.
+            - **Configurable Max Lean Scale:** Choose between 45° (Cruiser/Street), 55° (Sport/Twisties), or 65° (Track/MotoGP).
+            - **Trip Telemetry Tracking:** Moving Average Speed, Top Speed, Duration, Max L/R Lean, and G-Forces logged per ride.
+            - **Speed Units:** Toggle between KM/H and MPH.
+            - **Revamped Skeuomorphic Gauges:** Metallic brushed bezels, drop-glow needles, and illuminated tick marks across all 4 display styles (Classic Analog Dial, MotoGP Digital, Rally Twin Pods, and HUD Windshield Mirror).
 
             **Download & Install:**
-            Download `ApexTelemetry-v1.2.0.apk` below and open it on your Android phone.
-          files: release-apk/ApexTelemetry-v1.2.0.apk
+            Download `ApexTelemetry-v2.0.0.apk` below and open it on your Android phone.
+          files: release-apk/ApexTelemetry-v2.0.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

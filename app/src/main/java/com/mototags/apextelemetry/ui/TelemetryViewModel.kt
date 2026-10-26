@@ -6,8 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.mototags.apextelemetry.data.database.RideRepository
 import com.mototags.apextelemetry.data.location.LocationService
 import com.mototags.apextelemetry.data.sensor.TelemetrySensorManager
+import com.mototags.apextelemetry.model.DisplayStyle
+import com.mototags.apextelemetry.model.LeanScale
 import com.mototags.apextelemetry.model.RideSession
 import com.mototags.apextelemetry.model.RideState
+import com.mototags.apextelemetry.model.SpeedUnit
 import com.mototags.apextelemetry.model.TelemetryData
 import com.mototags.apextelemetry.ui.theme.AppTheme
 import kotlinx.coroutines.Job
@@ -34,8 +37,9 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     val savedRides: StateFlow<List<RideSession>> = _savedRides.asStateFlow()
 
     private var rideTimerJob: Job? = null
-    private var speedSamples = mutableListOf<Float>()
-    private var rideStartTime: Long = 0L
+    private var speedSumKmh = 0.0
+    private var speedCount = 0L
+    private var rideStartTime = 0L
 
     init {
         setupListeners()
@@ -45,20 +49,22 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     private fun setupListeners() {
         sensorManager.onLeanUpdated = { leanAngle ->
             _telemetryState.update { current ->
+                val limit = current.leanScale.maxDegrees.toFloat()
+                val clamped = leanAngle.coerceIn(-limit, limit)
+
                 if (current.rideState == RideState.RIDING) {
-                    val leftLean = if (leanAngle < 0f) abs(leanAngle) else 0f
-                    val rightLean = if (leanAngle > 0f) leanAngle else 0f
+                    val left = if (clamped < 0f) abs(clamped) else 0f
+                    val right = if (clamped > 0f) clamped else 0f
 
                     current.copy(
-                        currentLeanAngle = leanAngle,
-                        maxLeftLean = max(current.maxLeftLean, leftLean),
-                        maxRightLean = max(current.maxRightLean, rightLean),
+                        currentLeanAngle = clamped,
+                        maxLeftLean = max(current.maxLeftLean, left),
+                        maxRightLean = max(current.maxRightLean, right),
                         isCalibrated = sensorManager.isCalibrated
                     )
                 } else {
-                    // Preview lean angle even when not recording
                     current.copy(
-                        currentLeanAngle = leanAngle,
+                        currentLeanAngle = clamped,
                         isCalibrated = sensorManager.isCalibrated
                     )
                 }
@@ -87,12 +93,17 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         locationService.onSpeedUpdated = { speedKmh ->
             _telemetryState.update { current ->
                 if (current.rideState == RideState.RIDING) {
-                    speedSamples.add(speedKmh)
-                    val avg = if (speedSamples.isNotEmpty()) speedSamples.average().toFloat() else 0f
+                    val newMax = max(current.maxSpeedKmh, speedKmh)
+                    if (speedKmh > 3.0f) {
+                        speedSumKmh += speedKmh
+                        speedCount++
+                    }
+                    val newAvg = if (speedCount > 0) (speedSumKmh / speedCount).toFloat() else 0f
+
                     current.copy(
                         speedKmh = speedKmh,
-                        maxSpeedKmh = max(current.maxSpeedKmh, speedKmh),
-                        avgSpeedKmh = avg
+                        maxSpeedKmh = newMax,
+                        avgSpeedKmh = newAvg
                     )
                 } else {
                     current.copy(speedKmh = speedKmh)
@@ -101,10 +112,13 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /**
+     * Start Ride WITHOUT forced auto-calibration.
+     * Rider has full manual control over when to zero/calibrate.
+     */
     fun startRide() {
-        // Automatically tare/zero orientation at ride start
-        sensorManager.calibrateZero()
-        speedSamples.clear()
+        speedSumKmh = 0.0
+        speedCount = 0L
         rideStartTime = System.currentTimeMillis()
 
         _telemetryState.update { current ->
@@ -118,7 +132,8 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                 maxSpeedKmh = 0f,
                 avgSpeedKmh = 0f,
                 rideDurationSeconds = 0L,
-                isCalibrated = true
+                movingTimeSeconds = 0L,
+                isDrawerOpen = false
             )
         }
 
@@ -137,7 +152,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun finishRide() {
         rideTimerJob?.cancel()
-        _telemetryState.update { it.copy(rideState = RideState.SUMMARY) }
+        _telemetryState.update { it.copy(rideState = RideState.SUMMARY, showSummaryDialog = true) }
     }
 
     fun saveCurrentRide(title: String) {
@@ -157,11 +172,11 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
 
         rideRepository.saveRide(ride)
         loadSavedRides()
-        _telemetryState.update { it.copy(rideState = RideState.READY, activeTab = 1) }
+        _telemetryState.update { it.copy(rideState = RideState.READY, showSummaryDialog = false) }
     }
 
     fun discardRide() {
-        _telemetryState.update { it.copy(rideState = RideState.READY) }
+        _telemetryState.update { it.copy(rideState = RideState.READY, showSummaryDialog = false) }
     }
 
     fun deleteRide(id: String) {
@@ -169,26 +184,17 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         loadSavedRides()
     }
 
-    private fun startTimer() {
-        rideTimerJob?.cancel()
-        rideTimerJob = viewModelScope.launch {
-            while (isActive) {
-                delay(1000L)
-                _telemetryState.update { it.copy(rideDurationSeconds = it.rideDurationSeconds + 1) }
-            }
-        }
+    /**
+     * MANUAL ZERO CALIBRATION
+     */
+    fun calibrateManual() {
+        sensorManager.calibrateZero()
+        _telemetryState.update { it.copy(isCalibrated = true) }
     }
 
-    fun loadSavedRides() {
-        _savedRides.value = rideRepository.getAllRides()
-    }
-
-    fun setTheme(theme: AppTheme) {
-        _telemetryState.update { it.copy(selectedTheme = theme) }
-    }
-
-    fun setDisplayStyle(style: com.mototags.apextelemetry.model.DisplayStyle) {
-        _telemetryState.update { it.copy(displayStyle = style) }
+    fun resetCalibration() {
+        sensorManager.resetCalibration()
+        _telemetryState.update { it.copy(isCalibrated = false) }
     }
 
     fun toggleDirectionInvert() {
@@ -197,18 +203,49 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         _telemetryState.update { it.copy(isInvertedDirection = newInvert) }
     }
 
-    fun setActiveTab(tabIndex: Int) {
-        _telemetryState.update { it.copy(activeTab = tabIndex) }
+    fun setLeanScale(scale: LeanScale) {
+        _telemetryState.update { it.copy(leanScale = scale) }
     }
 
-    fun calibrateZero() {
-        sensorManager.calibrateZero()
-        _telemetryState.update { it.copy(isCalibrated = true) }
+    fun setSpeedUnit(unit: SpeedUnit) {
+        _telemetryState.update { it.copy(speedUnit = unit) }
+    }
+
+    fun setDisplayStyle(style: DisplayStyle) {
+        _telemetryState.update { it.copy(displayStyle = style) }
+    }
+
+    fun setTheme(theme: AppTheme) {
+        _telemetryState.update { it.copy(selectedTheme = theme) }
+    }
+
+    fun setDrawerOpen(open: Boolean) {
+        _telemetryState.update { it.copy(isDrawerOpen = open) }
     }
 
     fun setDisplayRotation(rotation: Int) {
         sensorManager.displayRotation = rotation
         _telemetryState.update { it.copy(displayRotation = rotation) }
+    }
+
+    private fun startTimer() {
+        rideTimerJob?.cancel()
+        rideTimerJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1000L)
+                _telemetryState.update { current ->
+                    val movingInc = if (current.speedKmh > 3.0f) 1L else 0L
+                    current.copy(
+                        rideDurationSeconds = current.rideDurationSeconds + 1,
+                        movingTimeSeconds = current.movingTimeSeconds + movingInc
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadSavedRides() {
+        _savedRides.value = rideRepository.getAllRides()
     }
 
     fun startTelemetry() {
