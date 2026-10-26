@@ -187,6 +187,16 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         _telemetryState.update { it.copy(selectedTheme = theme) }
     }
 
+    fun setDisplayStyle(style: com.mototags.apextelemetry.model.DisplayStyle) {
+        _telemetryState.update { it.copy(displayStyle = style) }
+    }
+
+    fun toggleDirectionInvert() {
+        val newInvert = !sensorManager.invertDirection
+        sensorManager.invertDirection = newInvert
+        _telemetryState.update { it.copy(isInvertedDirection = newInvert) }
+    }
+
     fun setActiveTab(tabIndex: Int) {
         _telemetryState.update { it.copy(activeTab = tabIndex) }
     }

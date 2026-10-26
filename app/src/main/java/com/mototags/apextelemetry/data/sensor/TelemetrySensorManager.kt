@@ -37,6 +37,8 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
     var isCalibrated: Boolean = false
         private set
 
+    var invertDirection: Boolean = false
+
     // Vibration low-pass filter
     private val alphaLean = 0.22f
     private val alphaAccel = 0.18f
@@ -117,21 +119,27 @@ class TelemetrySensorManager(context: Context) : SensorEventListener {
                     multiply3x3(tareInverseMatrix, remappedMatrix, relativeMatrix)
 
                     // Extract pure roll angle from relative matrix
-                    // In the calibrated reference frame, roll is rotation around the forward Y axis
+                    // Invert default sign so leaning right is positive (+), leaning left is negative (-)
                     val rollRad = atan2(relativeMatrix[6].toDouble(), relativeMatrix[7].toDouble())
-                    var rollDeg = Math.toDegrees(rollRad).toFloat()
+                    var rollDeg = -Math.toDegrees(rollRad).toFloat()
 
                     // Normalize to -180..180
                     if (rollDeg > 180f) rollDeg -= 360f
                     if (rollDeg < -180f) rollDeg += 360f
 
-                    // Leaning right is positive (+), leaning left is negative (-)
+                    if (invertDirection) {
+                        rollDeg = -rollDeg
+                    }
+
                     val targetAngle = rollDeg.coerceIn(-75f, 75f)
                     smoothedLeanAngle = (alphaLean * targetAngle) + ((1f - alphaLean) * smoothedLeanAngle)
                 } else {
-                    // When untared, compute basic level roll for calibration preview
+                    // When untared, compute preview roll (inverted to match bike orientation)
                     SensorManager.getOrientation(remappedMatrix, orientationAngles)
-                    val rawRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
+                    var rawRoll = -Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
+                    if (invertDirection) {
+                        rawRoll = -rawRoll
+                    }
                     smoothedLeanAngle = (alphaLean * rawRoll) + ((1f - alphaLean) * smoothedLeanAngle)
                 }
             }

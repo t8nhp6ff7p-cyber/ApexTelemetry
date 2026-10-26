@@ -34,34 +34,38 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release-apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v1.1.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v1.2.0.apk
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ApexTelemetry-v1.1.0-apk
-          path: release-apk/ApexTelemetry-v1.1.0.apk
+          name: ApexTelemetry-v1.2.0-apk
+          path: release-apk/ApexTelemetry-v1.2.0.apk
           retention-days: 30
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v1.1.0
-          name: "ApexTelemetry v1.1.0 - Pro Ride Tracking"
+          tag_name: v1.2.0
+          name: "ApexTelemetry v1.2.0 - Speedometer∞ Display Cluster & Inversion Fix"
           body: |
-            ### 🏍️ ApexTelemetry v1.1.0 (Major Upgrade)
+            ### 🏍️ ApexTelemetry v1.2.0 (Speedometer 55 / Speedometer∞ Edition)
             Motorcycle Lean & G-Force Telemetry HUD (Optimized for Samsung Galaxy S20 FE).
 
-            #### What's New in v1.1.0:
-            - **Start / Pause / Finish Ride Session Workflow:** Telemetry only activates and logs when you start a ride.
-            - **Aerospace 3D Quaternion Mount Calibration:** Pitch-decoupled matrix transformation fixes angle inaccuracy and eliminates handlebar tilt interference.
-            - **Dynamic Cockpit Theme Engine:** Choose between MotoGP Cyan, Ducati Red, KTM Amber, Ninja Lime, and Stealth Sunlight.
-            - **Saved Rides History:** Review past ride durations, peak cornering angles, top speeds, and braking G-forces.
-            - **Enhanced AMOLED Layout:** Full auto-rotation with high 120Hz refresh rate responsiveness.
+            #### What's New in v1.2.0:
+            - **Direction Reversed Fix:** Leaning right sweeps right (+), leaning left sweeps left (-).
+            - **On-Screen Direction Invert Toggle:** Direct toggle `[ DIR: NORMAL / INVERTED ]` for inverted mountings.
+            - **4 Distinct Gauge Cluster Displays (Speedometer∞ reference):**
+              1. **Digital Moto:** Modern MotoGP telemetry arc with segmented sweep and digital readouts.
+              2. **Analog Dial:** Classic physical round gauge cluster with sweeping needle, tick marks, and persistent peak needles.
+              3. **Rally Twin:** Dual binnacle instruments (Left: Roll Angle Dial, Right: Speedometer Dial).
+              4. **HUD Mirror Mode:** Windshield mirror reflection projection mode (flipped horizontally) for night riding.
+            - **Theme Engine:** Integrated across all 4 gauge clusters.
+            - **Ride Recording & Saved Logs:** Start/Pause/Finish ride sessions with local persistence.
 
             **Download & Install:**
-            Download `ApexTelemetry-v1.1.0.apk` below and open it on your Android phone.
-          files: release-apk/ApexTelemetry-v1.1.0.apk
+            Download `ApexTelemetry-v1.2.0.apk` below and open it on your Android phone.
+          files: release-apk/ApexTelemetry-v1.2.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

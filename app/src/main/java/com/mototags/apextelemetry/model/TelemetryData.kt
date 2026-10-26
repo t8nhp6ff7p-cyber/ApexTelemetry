@@ -2,9 +2,18 @@ package com.mototags.apextelemetry.model
 
 import com.mototags.apextelemetry.ui.theme.AppTheme
 
+enum class DisplayStyle(val title: String, val subtitle: String) {
+    DIGITAL_MOTO("Digital Moto", "MotoGP Telemetry HUD"),
+    ANALOG_DIAL("Analog Dial", "Classic Needle Gauge"),
+    RALLY_TWIN("Rally Twin", "Dual Instrument Binnacle"),
+    HUD_MIRROR("HUD Mirror", "Windshield Reflection Mode")
+}
+
 data class TelemetryData(
     val rideState: RideState = RideState.READY,
     val selectedTheme: AppTheme = AppTheme.MOTOGP_CYAN,
+    val displayStyle: DisplayStyle = DisplayStyle.DIGITAL_MOTO,
+    val isInvertedDirection: Boolean = false,
     val currentLeanAngle: Float = 0f,
     val maxLeftLean: Float = 0f,
     val maxRightLean: Float = 0f,
