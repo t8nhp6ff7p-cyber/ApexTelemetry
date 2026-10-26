@@ -8,7 +8,8 @@ data class TelemetryPoint(
     val longitudinalG: Float,
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
-    val altitude: Double = 0.0
+    val altitude: Double = 0.0,
+    val heading: Float = 0f
 )
 
 data class RideSession(
@@ -25,6 +26,7 @@ data class RideSession(
     val avgSpeedKmh: Float = 0f,
     val maxLateralG: Float = 0f,
     val maxBrakeG: Float = 0f,
+    val intelligence: RideIntelligence = RideIntelligence(),
     val points: List<TelemetryPoint> = emptyList(),
     val isRecovered: Boolean = false
 )

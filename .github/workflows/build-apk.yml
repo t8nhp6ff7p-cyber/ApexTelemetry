@@ -34,34 +34,38 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release-apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v2.1.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v2.2.0.apk
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ApexTelemetry-v2.1.0-apk
-          path: release-apk/ApexTelemetry-v2.1.0.apk
+          name: ApexTelemetry-v2.2.0-apk
+          path: release-apk/ApexTelemetry-v2.2.0.apk
           retention-days: 30
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v2.1.0
-          name: "ApexTelemetry v2.1.0 - Reliability First Edition"
+          tag_name: v2.2.0
+          name: "ApexTelemetry v2.2.0 - Ride Intelligence & Analysis Suite"
           body: |
-            ### 🏍️ ApexTelemetry v2.1.0 (Reliability First Edition)
-            Motorcycle Lean & G-Force Telemetry HUD (Optimized for Samsung Galaxy S20 FE).
+            ### 🏍️ ApexTelemetry v2.2.0 (Ride Intelligence & Analysis Suite)
+            Professional Motorcycle Telemetry, Post-Ride Route Replay & Analytics (Optimized for Samsung Galaxy S20 FE).
 
-            #### The 5 Pillars of Reliability in v2.1.0:
-            1. **Sensor Health & GPS Quality:** Live meter displaying GPS accuracy in ±meters (HDOP), satellite lock status, and IMU update rate (Hz).
-            2. **Reliable Ride Recording & Crash Recovery:** Write-Ahead Logging (WAL) saves in-flight ride points every 5 seconds to disk. If battery dies, phone overheats, or app crashes, the session is recovered on reboot.
-            3. **GPS Speed & Distance Integration:** High-precision geodesic trip odometer (km/mi) and multipath spike rejection (>280 km/h).
-            4. **Lean-Angle Validation & Manual Horizon Tare:** Aerospace 3D Quaternion gravity fusion with manual level confirmation.
-            5. **Ride History & Export Engine:** 1-tap **GPX Export** (for Strava/Garmin/Google Earth) and **CSV Telemetry Export** (for MoTeC/Excel) via Android Share Sheet.
+            #### What's New in v2.2.0:
+            1. **Interactive Route Replay & Track Map:** 2D GPS track visualization with scrubber slider (Play/Pause/2x Speed) colored by cornering intensity.
+            2. **Synchronized Telemetry Trace Charts:** Dual Canvas chart mapping Speed (km/h) and Lean Angle (Left vs Right) side-by-side with interactive scrub cursor.
+            3. **Acceleration & Hard Braking Event Detection:** Automatically detects and catalogs hard braking events (< -0.55g) and corner apexes.
+            4. **Elevation & Heading Intelligence:** Total elevation climb (meters), altitude profile, and compass bearing tracking.
+            5. **Rider Scorecard:** Fluidity & cornering smoothness rating (0-100) and left vs right turn breakdown.
+            6. **Multi-Format Export Engine:**
+               - **GPX** (with elevation, speed, course tags for Strava/Garmin/Google Earth)
+               - **KML** (Google Earth 3D flyover path)
+               - **CSV** (Data science spreadsheet with timestamps, coordinates, lean, G-force, speed, and heading)
 
             **Download & Install:**
-            Download `ApexTelemetry-v2.1.0.apk` below and open it on your Android phone.
-          files: release-apk/ApexTelemetry-v2.1.0.apk
+            Download `ApexTelemetry-v2.2.0.apk` below and open it on your Android phone.
+          files: release-apk/ApexTelemetry-v2.2.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

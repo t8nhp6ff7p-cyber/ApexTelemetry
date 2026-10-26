@@ -24,6 +24,7 @@ class LocationService(context: Context) {
         speedKmh: Float,
         accuracyMeters: Float,
         deltaDistanceKm: Float,
+        heading: Float,
         gpsQuality: GpsQuality
     ) -> Unit)? = null
 
@@ -68,6 +69,8 @@ class LocationService(context: Context) {
                     }
                 }
 
+                val heading = if (location.hasBearing()) location.bearing else 0f
+
                 lastValidLocation = location
 
                 onTelemetryLocation?.invoke(
@@ -77,6 +80,7 @@ class LocationService(context: Context) {
                     speedKmh,
                     accuracy,
                     deltaDistanceKm,
+                    heading,
                     quality
                 )
             }

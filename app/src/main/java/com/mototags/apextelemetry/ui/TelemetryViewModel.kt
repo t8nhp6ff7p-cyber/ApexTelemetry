@@ -34,6 +34,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     private val locationService = LocationService(application)
     private val rideRepository = RideRepository(application)
     private val rideExporter = RideExporter(application)
+    private val intelligenceAnalyzer = com.mototags.apextelemetry.data.intelligence.RideIntelligenceAnalyzer()
 
     private val _telemetryState = MutableStateFlow(TelemetryData())
     val telemetryState: StateFlow<TelemetryData> = _telemetryState.asStateFlow()
@@ -250,6 +251,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         synchronized(recordedPoints) {
             ptsCopy = ArrayList(recordedPoints)
         }
+        val intelligence = intelligenceAnalyzer.analyze(ptsCopy)
 
         val ride = RideSession(
             title = if (title.isBlank()) "Ride Session #${_savedRides.value.size + 1}" else title,
@@ -264,6 +266,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
             avgSpeedKmh = state.avgSpeedKmh,
             maxLateralG = state.maxLateralG,
             maxBrakeG = state.maxBrakeG,
+            intelligence = intelligence,
             points = ptsCopy
         )
 
@@ -285,6 +288,11 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     fun exportRideGpx(ride: RideSession) {
         val file = rideExporter.exportToGpx(ride)
         rideExporter.shareFile(file, "application/gpx+xml")
+    }
+
+    fun exportRideKml(ride: RideSession) {
+        val file = rideExporter.exportToKml(ride)
+        rideExporter.shareFile(file, "application/vnd.google-earth.kml+xml")
     }
 
     fun exportRideCsv(ride: RideSession) {

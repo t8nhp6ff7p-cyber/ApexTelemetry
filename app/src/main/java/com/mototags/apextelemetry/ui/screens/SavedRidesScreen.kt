@@ -46,6 +46,7 @@ import java.util.Locale
 @Composable
 fun SavedRidesScreen(
     rides: List<RideSession>,
+    onSelectRide: (RideSession) -> Unit,
     onDeleteRide: (String) -> Unit,
     onExportGpx: (RideSession) -> Unit,
     onExportCsv: (RideSession) -> Unit,
@@ -102,6 +103,7 @@ fun SavedRidesScreen(
             items(rides, key = { it.id }) { ride ->
                 RideCard(
                     ride = ride,
+                    onClick = { onSelectRide(ride) },
                     onDelete = { onDeleteRide(ride.id) },
                     onExportGpx = { onExportGpx(ride) },
                     onExportCsv = { onExportCsv(ride) }
@@ -114,6 +116,7 @@ fun SavedRidesScreen(
 @Composable
 private fun RideCard(
     ride: RideSession,
+    onClick: () -> Unit,
     onDelete: () -> Unit,
     onExportGpx: () -> Unit,
     onExportCsv: () -> Unit
@@ -128,7 +131,9 @@ private fun RideCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(

@@ -80,13 +80,22 @@ fun HUDDashboardScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     var showSavedRidesScreen by remember { mutableStateOf(false) }
+    var selectedRideForAnalysis by remember { mutableStateOf<com.mototags.apextelemetry.model.RideSession?>(null) }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(PureBlack)
     ) {
-        if (showSavedRidesScreen) {
+        if (selectedRideForAnalysis != null) {
+            com.mototags.apextelemetry.ui.screens.PostRideAnalysisScreen(
+                ride = selectedRideForAnalysis!!,
+                onBack = { selectedRideForAnalysis = null },
+                onExportGpx = { viewModel.exportRideGpx(selectedRideForAnalysis!!) },
+                onExportKml = { viewModel.exportRideKml(selectedRideForAnalysis!!) },
+                onExportCsv = { viewModel.exportRideCsv(selectedRideForAnalysis!!) }
+            )
+        } else if (showSavedRidesScreen) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
@@ -111,6 +120,7 @@ fun HUDDashboardScreen(
                 }
                 SavedRidesScreen(
                     rides = savedRides,
+                    onSelectRide = { selectedRideForAnalysis = it },
                     onDeleteRide = { viewModel.deleteRide(it) },
                     onExportGpx = { viewModel.exportRideGpx(it) },
                     onExportCsv = { viewModel.exportRideCsv(it) },
