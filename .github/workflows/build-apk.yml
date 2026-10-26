@@ -34,34 +34,34 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release-apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v1.0.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-apk/ApexTelemetry-v1.1.0.apk
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ApexTelemetry-v1.0.0-apk
-          path: release-apk/ApexTelemetry-v1.0.0.apk
+          name: ApexTelemetry-v1.1.0-apk
+          path: release-apk/ApexTelemetry-v1.1.0.apk
           retention-days: 30
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v1.0.0
-          name: "ApexTelemetry v1.0.0"
+          tag_name: v1.1.0
+          name: "ApexTelemetry v1.1.0 - Pro Ride Tracking"
           body: |
-            ### 🏍️ ApexTelemetry v1.0.0 for Android
+            ### 🏍️ ApexTelemetry v1.1.0 (Major Upgrade)
             Motorcycle Lean & G-Force Telemetry HUD (Optimized for Samsung Galaxy S20 FE).
 
-            #### Features:
-            - Auto-Rotation support (Portrait & Landscape)
-            - Live Lean Angle Gauge with Peak Hold
-            - 2D G-Force Friction Radar (Braking & Cornering G)
-            - GPS Speedometer & Top Speed
-            - One-tap Mount Zero Calibration
+            #### What's New in v1.1.0:
+            - **Start / Pause / Finish Ride Session Workflow:** Telemetry only activates and logs when you start a ride.
+            - **Aerospace 3D Quaternion Mount Calibration:** Pitch-decoupled matrix transformation fixes angle inaccuracy and eliminates handlebar tilt interference.
+            - **Dynamic Cockpit Theme Engine:** Choose between MotoGP Cyan, Ducati Red, KTM Amber, Ninja Lime, and Stealth Sunlight.
+            - **Saved Rides History:** Review past ride durations, peak cornering angles, top speeds, and braking G-forces.
+            - **Enhanced AMOLED Layout:** Full auto-rotation with high 120Hz refresh rate responsiveness.
 
             **Download & Install:**
-            Download `ApexTelemetry-v1.0.0.apk` below and open it on your Android phone.
-          files: release-apk/ApexTelemetry-v1.0.0.apk
+            Download `ApexTelemetry-v1.1.0.apk` below and open it on your Android phone.
+          files: release-apk/ApexTelemetry-v1.1.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

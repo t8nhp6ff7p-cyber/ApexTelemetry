@@ -3,24 +3,28 @@ package com.mototags.apextelemetry.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-
-private val DarkColorScheme = darkColorScheme(
-    primary = NeonCyan,
-    secondary = NeonOrange,
-    tertiary = NeonGreen,
-    background = PureBlack,
-    surface = DarkSurface,
-    onPrimary = PureBlack,
-    onSecondary = PureBlack,
-    onTertiary = PureBlack,
-    onBackground = BrightWhite,
-    onSurface = BrightWhite,
-)
+import androidx.compose.ui.graphics.Color
 
 @Composable
-fun ApexTelemetryTheme(content: @Composable () -> Unit) {
+fun ApexTelemetryTheme(
+    selectedTheme: AppTheme = AppTheme.MOTOGP_CYAN,
+    content: @Composable () -> Unit
+) {
+    val colorScheme = darkColorScheme(
+        primary = selectedTheme.primaryColor,
+        secondary = selectedTheme.secondaryColor,
+        tertiary = selectedTheme.secondaryColor,
+        background = Color.Black,
+        surface = selectedTheme.surfaceColor,
+        onPrimary = Color.Black,
+        onSecondary = Color.Black,
+        onTertiary = Color.Black,
+        onBackground = Color.White,
+        onSurface = Color.White
+    )
+
     MaterialTheme(
-        colorScheme = DarkColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )
