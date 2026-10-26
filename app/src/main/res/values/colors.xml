@@ -1,0 +1,7 @@
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="hud_background">#FF0A0B0E</color>
+    <color name="cyan_accent">#FF00E5FF</color>
+    <color name="orange_accent">#FFFF6D00</color>
+</resources>

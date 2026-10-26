@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Arc -->
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M 30,70 A 30,30 0 1,1 78,70" />
+    <!-- Dynamic Lean Needle -->
+    <path
+        android:strokeColor="#FF6D00"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M 54,54 L 72,36" />
+    <!-- Center Pivot -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M 54,54 m -4,0 a 4,4 0 1,0 8,0 a 4,4 0 1,0 -8,0" />
+</vector>
