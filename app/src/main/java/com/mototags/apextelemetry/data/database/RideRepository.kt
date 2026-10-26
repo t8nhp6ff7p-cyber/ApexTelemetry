@@ -98,6 +98,7 @@ class RideRepository(context: Context) {
                     put("lat", p.latitude)
                     put("lon", p.longitude)
                     put("alt", p.altitude)
+                    put("h", p.heading.toDouble())
                 }
                 ptsArray.put(ptObj)
             }
@@ -121,7 +122,8 @@ class RideRepository(context: Context) {
                         longitudinalG = p.optDouble("bg", 0.0).toFloat(),
                         latitude = p.optDouble("lat", 0.0),
                         longitude = p.optDouble("lon", 0.0),
-                        altitude = p.optDouble("alt", 0.0)
+                        altitude = p.optDouble("alt", 0.0),
+                        heading = p.optDouble("h", 0.0).toFloat()
                     )
                 )
             }
@@ -141,6 +143,7 @@ class RideRepository(context: Context) {
             avgSpeedKmh = obj.optDouble("avgSpeedKmh", 0.0).toFloat(),
             maxLateralG = obj.optDouble("maxLateralG", 0.0).toFloat(),
             maxBrakeG = obj.optDouble("maxBrakeG", 0.0).toFloat(),
+            intelligence = com.mototags.apextelemetry.data.intelligence.RideIntelligenceAnalyzer().analyze(ptsList),
             points = ptsList
         )
     }

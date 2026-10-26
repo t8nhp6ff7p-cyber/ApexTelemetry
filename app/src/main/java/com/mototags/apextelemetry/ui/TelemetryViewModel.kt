@@ -131,7 +131,7 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        locationService.onTelemetryLocation = { lat, lon, alt, speedKmh, accuracy, deltaDistKm, quality ->
+        locationService.onTelemetryLocation = { lat, lon, alt, speedKmh, accuracy, deltaDistKm, heading, quality ->
             _telemetryState.update { current ->
                 val newDist = current.tripDistanceKm + (if (current.rideState == RideState.RIDING) deltaDistKm else 0f)
                 val newMax = if (current.rideState == RideState.RIDING) max(current.maxSpeedKmh, speedKmh) else current.maxSpeedKmh
@@ -152,7 +152,8 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                         longitudinalG = current.longitudinalG,
                         latitude = lat,
                         longitude = lon,
-                        altitude = alt
+                        altitude = alt,
+                        heading = heading
                     )
                     synchronized(recordedPoints) {
                         recordedPoints.add(pt)
